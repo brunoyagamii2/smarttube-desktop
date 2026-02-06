@@ -370,6 +370,30 @@ export const appRouter = router({
   }),
 
   youtube: router({
+    autocomplete: protectedProcedure
+      .input(z.object({
+        query: z.string().min(1),
+        language: z.string().optional().default("pt"),
+        country: z.string().optional().default("BR"),
+      }))
+      .query(async ({ input }) => {
+        try {
+          const url = `https://clients1.google.com/complete/search?client=youtube&hl=${input.language}&gl=${input.country}&ds=yt&q=${encodeURIComponent(input.query)}`;
+          const response = await fetch(url);
+          const text = await response.text();
+
+          // Parse JSONP response: window.google.ac.h([...])
+          const jsonStr = text.replace(/^window\.google\.ac\.h\(/, "").replace(/\)$/, "");
+          const data = JSON.parse(jsonStr);
+          const suggestions: string[] = (data[1] || []).map((item: any[]) => item[0]);
+
+          return { suggestions };
+        } catch (error) {
+          console.error("YouTube autocomplete error:", error);
+          return { suggestions: [] };
+        }
+      }),
+
     search: protectedProcedure
       .input(z.object({
         query: z.string().min(1),

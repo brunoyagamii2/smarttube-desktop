@@ -65,3 +65,4 @@
 - [x] Vídeos relacionados na sidebar durante reprodução
 - [x] Tema escuro com cores vermelhas (estilo SmartTube)
 - [x] Testes para procedures YouTube e SponsorBlock
+- [x] Autocompletar na barra de busca do YouTube com sugestões em tempo real
