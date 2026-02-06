@@ -5,14 +5,24 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import Library from "./pages/Library";
+import Watch from "./pages/Watch";
+import Playlists from "./pages/Playlists";
+import PlaylistDetail from "./pages/PlaylistDetail";
+import History from "./pages/History";
+import Settings from "./pages/Settings";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
       <Route path={"/"} component={Home} />
+      <Route path={"/library"} component={Library} />
+      <Route path={"/watch/:id"} component={Watch} />
+      <Route path={"/playlists"} component={Playlists} />
+      <Route path={"/playlist/:id"} component={PlaylistDetail} />
+      <Route path={"/history"} component={History} />
+      <Route path={"/settings"} component={Settings} />
       <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
       <Route component={NotFound} />
     </Switch>
   );
