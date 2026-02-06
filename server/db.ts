@@ -9,12 +9,14 @@ import {
   watchHistory, 
   userSettings,
   videoTranscriptions,
+  youtubeHistory,
   InsertVideo,
   InsertPlaylist,
   InsertPlaylistItem,
   InsertWatchHistory,
   InsertUserSettings,
-  InsertVideoTranscription
+  InsertVideoTranscription,
+  InsertYouTubeHistory
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -408,4 +410,84 @@ export async function getVideoTranscriptions(videoId: number) {
     .from(videoTranscriptions)
     .where(eq(videoTranscriptions.videoId, videoId))
     .orderBy(desc(videoTranscriptions.createdAt));
+}
+
+// ============= YOUTUBE HISTORY FUNCTIONS =============
+
+export async function upsertYouTubeHistory(entry: InsertYouTubeHistory) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existing = await db
+    .select()
+    .from(youtubeHistory)
+    .where(
+      and(
+        eq(youtubeHistory.sessionId, entry.sessionId),
+        eq(youtubeHistory.youtubeVideoId, entry.youtubeVideoId)
+      )
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    return await db
+      .update(youtubeHistory)
+      .set({
+        title: entry.title,
+        channelName: entry.channelName,
+        channelId: entry.channelId,
+        thumbnailUrl: entry.thumbnailUrl,
+        duration: entry.duration,
+        currentTime: entry.currentTime,
+        completed: entry.completed,
+        lastWatchedAt: new Date(),
+      })
+      .where(eq(youtubeHistory.id, existing[0]!.id));
+  } else {
+    return await db.insert(youtubeHistory).values(entry);
+  }
+}
+
+export async function getYouTubeHistory(sessionId: string, limit = 50) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db
+    .select()
+    .from(youtubeHistory)
+    .where(eq(youtubeHistory.sessionId, sessionId))
+    .orderBy(desc(youtubeHistory.lastWatchedAt))
+    .limit(limit);
+}
+
+export async function getYouTubeHistoryByVideoId(sessionId: string, videoId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db
+    .select()
+    .from(youtubeHistory)
+    .where(
+      and(
+        eq(youtubeHistory.sessionId, sessionId),
+        eq(youtubeHistory.youtubeVideoId, videoId)
+      )
+    )
+    .limit(1);
+
+  return result[0];
+}
+
+export async function getRecentYouTubeSearchTerms(sessionId: string, limit = 10) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const results = await db
+    .select({ title: youtubeHistory.title })
+    .from(youtubeHistory)
+    .where(eq(youtubeHistory.sessionId, sessionId))
+    .orderBy(desc(youtubeHistory.lastWatchedAt))
+    .limit(limit);
+
+  return results.map(r => r.title);
 }

@@ -71,134 +71,6 @@ export const appRouter = router({
     }),
   }),
 
-  videos: router({
-    list: protectedProcedure
-      .input(z.object({
-        limit: z.number().optional().default(50),
-        offset: z.number().optional().default(0),
-      }))
-      .query(async ({ ctx, input }) => {
-        return await db.getVideosByUserId(ctx.user.id, input.limit, input.offset);
-      }),
-
-    search: protectedProcedure
-      .input(z.object({
-        query: z.string(),
-        limit: z.number().optional().default(50),
-      }))
-      .query(async ({ ctx, input }) => {
-        return await db.searchVideos(ctx.user.id, input.query, input.limit);
-      }),
-
-    getById: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getVideoById(input.id);
-      }),
-
-    create: protectedProcedure
-      .input(z.object({
-        title: z.string(),
-        description: z.string().optional(),
-        videoUrl: z.string(),
-        thumbnailUrl: z.string().optional(),
-        duration: z.number(),
-        fileSize: z.number().optional(),
-        mimeType: z.string().optional(),
-        quality: z.string().optional(),
-      }))
-      .mutation(async ({ ctx, input }) => {
-        return await db.createVideo({
-          ...input,
-          userId: ctx.user.id,
-        });
-      }),
-
-    update: protectedProcedure
-      .input(z.object({
-        id: z.number(),
-        title: z.string().optional(),
-        description: z.string().optional(),
-        thumbnailUrl: z.string().optional(),
-      }))
-      .mutation(async ({ input }) => {
-        const { id, ...updates } = input;
-        return await db.updateVideo(id, updates);
-      }),
-
-    delete: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        return await db.deleteVideo(input.id);
-      }),
-
-    incrementViews: protectedProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        return await db.incrementVideoViews(input.id);
-      }),
-
-    generateThumbnail: protectedProcedure
-      .input(z.object({
-        videoId: z.number(),
-        prompt: z.string(),
-      }))
-      .mutation(async ({ input }) => {
-        const { url } = await generateImage({
-          prompt: input.prompt,
-        });
-        
-        await db.updateVideo(input.videoId, {
-          thumbnailUrl: url,
-        });
-
-        return { thumbnailUrl: url };
-      }),
-
-    transcribe: protectedProcedure
-      .input(z.object({
-        videoId: z.number(),
-        audioUrl: z.string(),
-        language: z.string().optional(),
-      }))
-      .mutation(async ({ input }) => {
-        const result = await transcribeAudio({
-          audioUrl: input.audioUrl,
-          language: input.language,
-        });
-
-        // Check if transcription failed
-        if ('error' in result) {
-          throw new Error(result.error);
-        }
-
-        // Convert to VTT format
-        let vttContent = "WEBVTT\n\n";
-        if (result.segments) {
-          for (const segment of result.segments) {
-            const start = formatTime(segment.start);
-            const end = formatTime(segment.end);
-            vttContent += `${start} --> ${end}\n${segment.text.trim()}\n\n`;
-          }
-        }
-
-        await db.createVideoTranscription({
-          videoId: input.videoId,
-          language: result.language || input.language || "en",
-          transcription: vttContent,
-          generatedBy: "whisper",
-        });
-
-        return { transcription: vttContent, language: result.language };
-      }),
-
-    getTranscriptions: protectedProcedure
-      .input(z.object({ videoId: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getVideoTranscriptions(input.videoId);
-      }),
-  }),
-
   playlists: router({
     list: protectedProcedure
       .query(async ({ ctx }) => {
@@ -277,57 +149,24 @@ export const appRouter = router({
       }),
   }),
 
-  history: router({
-    list: protectedProcedure
-      .input(z.object({
-        limit: z.number().optional().default(50),
-      }))
-      .query(async ({ ctx, input }) => {
-        return await db.getWatchHistory(ctx.user.id, input.limit);
-      }),
-
-    getForVideo: protectedProcedure
-      .input(z.object({ videoId: z.number() }))
-      .query(async ({ ctx, input }) => {
-        return await db.getVideoWatchHistory(ctx.user.id, input.videoId);
-      }),
-
-    update: protectedProcedure
-      .input(z.object({
-        videoId: z.number(),
-        currentTime: z.number(),
-        duration: z.number(),
-        completed: z.boolean().optional().default(false),
-      }))
-      .mutation(async ({ ctx, input }) => {
-        return await db.upsertWatchHistory({
-          userId: ctx.user.id,
-          videoId: input.videoId,
-          currentTime: input.currentTime,
-          duration: input.duration,
-          completed: input.completed,
-        });
-      }),
-  }),
-
   settings: router({
-    get: protectedProcedure
+    get: publicProcedure
       .query(async ({ ctx }) => {
-        const settings = await db.getUserSettings(ctx.user.id);
-        if (!settings) {
-          // Return default settings
-          return {
-            userId: ctx.user.id,
-            defaultPlaybackSpeed: 1.0,
-            defaultQuality: "auto",
-            autoplay: true,
-            sponsorBlockEnabled: true,
-            sponsorBlockCategories: ["sponsor", "intro", "outro", "selfpromo"],
-            autoGenerateCaptions: false,
-            theme: "dark" as const,
-          };
+        if (ctx.user) {
+          const settings = await db.getUserSettings(ctx.user.id);
+          if (settings) return settings;
         }
-        return settings;
+        // Return default settings for unauthenticated users
+        return {
+          userId: ctx.user?.id || 0,
+          defaultPlaybackSpeed: 1.0,
+          defaultQuality: "auto",
+          autoplay: true,
+          sponsorBlockEnabled: true,
+          sponsorBlockCategories: ["sponsor", "intro", "outro", "selfpromo"],
+          autoGenerateCaptions: false,
+          theme: "dark" as const,
+        };
       }),
 
     update: protectedProcedure
@@ -349,9 +188,9 @@ export const appRouter = router({
   }),
 
   sponsorBlock: router({
-    getSegments: protectedProcedure
+    getSegments: publicProcedure
       .input(z.object({
-        videoId: z.string(), // YouTube video ID
+        videoId: z.string(),
         categories: z.array(z.string()).optional(),
       }))
       .query(async ({ input }) => {
@@ -369,8 +208,44 @@ export const appRouter = router({
       }),
   }),
 
+  youtubeHistory: router({
+    save: publicProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        youtubeVideoId: z.string(),
+        title: z.string(),
+        channelName: z.string().optional(),
+        channelId: z.string().optional(),
+        thumbnailUrl: z.string().optional(),
+        duration: z.number().default(0),
+        currentTime: z.number().default(0),
+        completed: z.boolean().default(false),
+      }))
+      .mutation(async ({ input }) => {
+        return await db.upsertYouTubeHistory(input);
+      }),
+
+    list: publicProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        limit: z.number().optional().default(50),
+      }))
+      .query(async ({ input }) => {
+        return await db.getYouTubeHistory(input.sessionId, input.limit);
+      }),
+
+    getForVideo: publicProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        youtubeVideoId: z.string(),
+      }))
+      .query(async ({ input }) => {
+        return await db.getYouTubeHistoryByVideoId(input.sessionId, input.youtubeVideoId);
+      }),
+  }),
+
   youtube: router({
-    autocomplete: protectedProcedure
+    autocomplete: publicProcedure
       .input(z.object({
         query: z.string().min(1),
         language: z.string().optional().default("pt"),
@@ -382,7 +257,6 @@ export const appRouter = router({
           const response = await fetch(url);
           const text = await response.text();
 
-          // Parse JSONP response: window.google.ac.h([...])
           const jsonStr = text.replace(/^window\.google\.ac\.h\(/, "").replace(/\)$/, "");
           const data = JSON.parse(jsonStr);
           const suggestions: string[] = (data[1] || []).map((item: any[]) => item[0]);
@@ -394,7 +268,7 @@ export const appRouter = router({
         }
       }),
 
-    search: protectedProcedure
+    search: publicProcedure
       .input(z.object({
         query: z.string().min(1),
         cursor: z.string().optional(),
@@ -429,14 +303,13 @@ export const appRouter = router({
         }
       }),
 
-    trending: protectedProcedure
+    trending: publicProcedure
       .input(z.object({
         language: z.string().optional().default("pt"),
         country: z.string().optional().default("BR"),
       }))
       .query(async ({ input }) => {
         try {
-          // Search for trending/popular content
           const result = await callDataApi("Youtube/search", {
             query: {
               q: "trending",
@@ -457,7 +330,7 @@ export const appRouter = router({
         }
       }),
 
-    channelVideos: protectedProcedure
+    channelVideos: publicProcedure
       .input(z.object({
         channelId: z.string(),
         cursor: z.string().optional(),
@@ -491,27 +364,28 @@ export const appRouter = router({
         }
       }),
 
-    suggestions: protectedProcedure
+    suggestions: publicProcedure
       .input(z.object({
+        sessionId: z.string().optional(),
         language: z.string().optional().default("pt"),
         country: z.string().optional().default("BR"),
       }))
-      .query(async ({ ctx, input }) => {
+      .query(async ({ input }) => {
         try {
-          // Get user's watch history to build suggestions
-          const history = await db.getWatchHistory(ctx.user.id, 20);
-          
-          // Extract video titles from history for context
-          const watchedTitles = history
-            .filter(h => h.video)
-            .map(h => h.video?.title)
-            .filter(Boolean)
-            .slice(0, 10);
+          let watchedTitles: string[] = [];
+
+          // Get YouTube watch history for suggestions
+          if (input.sessionId) {
+            const history = await db.getYouTubeHistory(input.sessionId, 20);
+            watchedTitles = history
+              .map(h => h.title)
+              .filter(Boolean)
+              .slice(0, 10);
+          }
 
           let searchQueries: string[] = [];
 
           if (watchedTitles.length > 0) {
-            // Use LLM to generate smart search queries based on history
             try {
               const response = await invokeLLM({
                 messages: [
@@ -550,11 +424,9 @@ export const appRouter = router({
               searchQueries = parsed.queries || [];
             } catch (llmError) {
               console.error("LLM suggestion error:", llmError);
-              // Fallback: use watched titles directly
-              searchQueries = watchedTitles.slice(0, 4) as string[];
+              searchQueries = watchedTitles.slice(0, 4);
             }
           } else {
-            // No history - use default popular categories
             searchQueries = [
               "melhores vídeos tecnologia 2026",
               "tutoriais programação",
@@ -563,7 +435,6 @@ export const appRouter = router({
             ];
           }
 
-          // Fetch videos for each query in parallel
           const allResults = await Promise.all(
             searchQueries.slice(0, 4).map(async (query) => {
               try {

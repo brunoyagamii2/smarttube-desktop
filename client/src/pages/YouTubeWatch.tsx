@@ -1,30 +1,42 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useRoute, Link } from "wouter";
 import VideoLayout from "@/components/VideoLayout";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ThumbsUp,
   Share2,
   ListPlus,
   CheckCircle2,
-  Eye,
-  Clock,
-  Radio,
-  Loader2,
   ExternalLink,
+  Radio,
 } from "lucide-react";
 import { toast } from "sonner";
-import { VideoCardCompact, formatDuration, formatViews } from "./YouTubeSearch";
-import type { YouTubeVideo } from "./YouTubeSearch";
+import { formatDuration, formatViews } from "./YouTubeSearch";
+
+function getSessionId(): string {
+  let sessionId = localStorage.getItem("smarttube_session_id");
+  if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    localStorage.setItem("smarttube_session_id", sessionId);
+  }
+  return sessionId;
+}
 
 export default function YouTubeWatch() {
   const [, params] = useRoute("/youtube/:videoId");
   const videoId = params?.videoId || "";
+  const sessionId = useMemo(() => getSessionId(), []);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [videoTitle, setVideoTitle] = useState("");
+  const [channelName, setChannelName] = useState("");
+  const [channelId, setChannelId] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [videoDuration, setVideoDuration] = useState(0);
+  const historySaved = useRef(false);
 
   // Fetch SponsorBlock segments
   const { data: settings } = trpc.settings.get.useQuery();
@@ -39,12 +51,89 @@ export default function YouTubeWatch() {
     { enabled: !!videoId && settings?.sponsorBlockEnabled === true }
   );
 
-  // Search for related videos
+  // Get existing history for this video
+  const { data: existingHistory } = trpc.youtubeHistory.getForVideo.useQuery(
+    { sessionId, youtubeVideoId: videoId },
+    { enabled: !!videoId }
+  );
+
+  // Save history mutation
+  const saveHistoryMutation = trpc.youtubeHistory.save.useMutation();
+
+  // Search for related videos based on videoId
   const stableVideoId = useMemo(() => videoId, [videoId]);
   const { data: relatedData, isLoading: relatedLoading } = trpc.youtube.search.useQuery(
     { query: stableVideoId, language: "pt", country: "BR" },
     { enabled: !!stableVideoId }
   );
+
+  // Extract video info from related data or use defaults
+  useEffect(() => {
+    if (relatedData?.videos && relatedData.videos.length > 0) {
+      // Try to find the current video in related results
+      const currentVideo = relatedData.videos.find((v: any) => v?.videoId === videoId);
+      if (currentVideo) {
+        setVideoTitle(currentVideo.title);
+        setChannelName(currentVideo.channelName);
+        setChannelId(currentVideo.channelId);
+        setThumbnailUrl(currentVideo.thumbnailUrl);
+        setVideoDuration(currentVideo.duration);
+      }
+    }
+  }, [relatedData, videoId]);
+
+  // Save to history when video loads
+  useEffect(() => {
+    if (!videoId || historySaved.current) return;
+    
+    // Set thumbnail from YouTube
+    const thumb = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+    setThumbnailUrl(prev => prev || thumb);
+
+    // Save initial history entry
+    const timer = setTimeout(() => {
+      saveHistoryMutation.mutate({
+        sessionId,
+        youtubeVideoId: videoId,
+        title: videoTitle || `Vídeo ${videoId}`,
+        channelName: channelName || undefined,
+        channelId: channelId || undefined,
+        thumbnailUrl: thumbnailUrl || thumb,
+        duration: videoDuration,
+        currentTime: existingHistory?.currentTime || 0,
+        completed: false,
+      });
+      historySaved.current = true;
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [videoId, videoTitle, channelName, sessionId]);
+
+  // Update history periodically
+  useEffect(() => {
+    if (!videoId) return;
+
+    const interval = setInterval(() => {
+      saveHistoryMutation.mutate({
+        sessionId,
+        youtubeVideoId: videoId,
+        title: videoTitle || `Vídeo ${videoId}`,
+        channelName: channelName || undefined,
+        channelId: channelId || undefined,
+        thumbnailUrl: thumbnailUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+        duration: videoDuration,
+        currentTime: 0, // Can't track iframe progress
+        completed: false,
+      });
+    }, 30000); // Every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [videoId, videoTitle, channelName, thumbnailUrl, videoDuration, sessionId]);
+
+  // Reset saved flag when videoId changes
+  useEffect(() => {
+    historySaved.current = false;
+  }, [videoId]);
 
   if (!videoId) {
     return (
@@ -66,6 +155,7 @@ export default function YouTubeWatch() {
               {/* YouTube Player Embed */}
               <div className="aspect-video bg-black rounded-xl overflow-hidden">
                 <iframe
+                  ref={iframeRef}
                   src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`}
                   title="YouTube Video Player"
                   className="w-full h-full"
@@ -86,6 +176,18 @@ export default function YouTubeWatch() {
                     </span>
                   </CardContent>
                 </Card>
+              )}
+
+              {/* Video Title */}
+              {videoTitle && (
+                <div className="space-y-1">
+                  <h1 className="text-xl font-bold text-foreground">{videoTitle}</h1>
+                  {channelName && (
+                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                      {channelName}
+                    </p>
+                  )}
+                </div>
               )}
 
               {/* Video Actions */}
@@ -130,8 +232,9 @@ export default function YouTubeWatch() {
                     </div>
                   ))
                 )}
-                {relatedData?.videos?.map((video) => (
-                  video && (
+                {relatedData?.videos
+                  ?.filter((video: any) => video && video.videoId !== videoId)
+                  .map((video: any) => (
                     <Link key={video.videoId} href={`/youtube/${video.videoId}`}>
                       <div className="flex gap-2 group cursor-pointer hover:bg-accent/50 rounded-lg p-1 -mx-1 transition-colors">
                         <div className="relative w-[168px] min-w-[168px] aspect-video rounded-lg overflow-hidden bg-muted flex-shrink-0">
@@ -167,8 +270,7 @@ export default function YouTubeWatch() {
                         </div>
                       </div>
                     </Link>
-                  )
-                ))}
+                  ))}
               </div>
             </div>
           </div>

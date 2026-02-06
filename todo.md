@@ -66,3 +66,10 @@
 - [x] Tema escuro com cores vermelhas (estilo SmartTube)
 - [x] Testes para procedures YouTube e SponsorBlock
 - [x] Autocompletar na barra de busca do YouTube com sugestões em tempo real
+
+## Correções e Alterações Solicitadas
+- [x] Corrigir histórico de reprodução (agora usa youtubeHistory com sessionId anônimo)
+- [x] Permitir acesso sem credenciais (todas as procedures principais são públicas)
+- [x] Remover a biblioteca da plataforma (página e navegação removidas)
+- [x] Tabela youtubeHistory criada para rastrear vídeos do YouTube sem autenticação
+- [x] Login agora é opcional (botão "Entrar (opcional)" na sidebar)

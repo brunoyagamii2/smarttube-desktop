@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS `youtubeHistory` (\n  `id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,\n  `sessionId` varchar(128) NOT NULL,\n  `youtubeVideoId` varchar(20) NOT NULL,\n  `title` varchar(500) NOT NULL,\n  `channelName` varchar(255),\n  `channelId` varchar(64),\n  `thumbnailUrl` text,\n  `duration` int NOT NULL DEFAULT 0,\n  `currentTime` float NOT NULL DEFAULT 0,\n  `completed` boolean NOT NULL DEFAULT false,\n  `lastWatchedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  UNIQUE KEY `unique_session_video` (`sessionId`, `youtubeVideoId`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2r3f3cWMTbxLtDs.df5e41447897 --database T8AWmRE7wx5ioxNGuemY3B --execute CREATE TABLE IF NOT EXISTS `youtubeHistory` (\n  `id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,\n  `sessionId` varchar(128) NOT NULL,\n  `youtubeVideoId` varchar(20) NOT NULL,\n  `title` varchar(500) NOT NULL,\n  `channelName` varchar(255),\n  `channelId` varchar(64),\n  `thumbnailUrl` text,\n  `duration` int NOT NULL DEFAULT 0,\n  `currentTime` float NOT NULL DEFAULT 0,\n  `completed` boolean NOT NULL DEFAULT false,\n  `lastWatchedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  UNIQUE KEY `unique_session_video` (`sessionId`, `youtubeVideoId`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 178
+}

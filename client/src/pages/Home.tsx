@@ -1,6 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { getLoginUrl } from "@/const";
 import VideoLayout from "@/components/VideoLayout";
 import { trpc } from "@/lib/trpc";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
   Play,
-  Upload,
   Search,
   TrendingUp,
   Sparkles,
@@ -19,6 +17,17 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { Link } from "wouter";
+import { useMemo } from "react";
+
+// Session ID for anonymous history tracking
+function getSessionId(): string {
+  let sessionId = localStorage.getItem("smarttube_session_id");
+  if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    localStorage.setItem("smarttube_session_id", sessionId);
+  }
+  return sessionId;
+}
 
 function formatDuration(seconds: number): string {
   if (!seconds) return "LIVE";
@@ -71,7 +80,6 @@ function VideoGridCard({ video }: { video: YouTubeVideo }) {
               {formatDuration(video.duration)}
             </span>
           ) : null}
-          {/* Play overlay */}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
             <div className="w-12 h-12 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
               <Play className="w-6 h-6 text-white" fill="white" />
@@ -153,7 +161,10 @@ function SuggestionSkeleton() {
 }
 
 function ContinueWatchingSection() {
-  const { data: history, isLoading } = trpc.history.list.useQuery({ limit: 10 });
+  const sessionId = useMemo(() => getSessionId(), []);
+  const { data: history, isLoading } = trpc.youtubeHistory.list.useQuery(
+    { sessionId, limit: 10 }
+  );
 
   if (isLoading) {
     return (
@@ -173,7 +184,7 @@ function ContinueWatchingSection() {
 
   if (!history || history.length === 0) return null;
 
-  const incompleteItems = history.filter(h => !h.completed && h.video);
+  const incompleteItems = history.filter((h: any) => !h.completed);
 
   if (incompleteItems.length === 0) return null;
 
@@ -185,14 +196,14 @@ function ContinueWatchingSection() {
       </div>
       <ScrollArea className="w-full">
         <div className="flex gap-4 pb-4">
-          {incompleteItems.slice(0, 8).map((item) => (
-            <Link key={item.id} href={`/watch/${item.videoId}`}>
+          {incompleteItems.slice(0, 8).map((item: any) => (
+            <Link key={item.id} href={`/youtube/${item.youtubeVideoId}`}>
               <div className="group cursor-pointer w-[280px] flex-shrink-0">
                 <div className="relative aspect-video rounded-xl overflow-hidden bg-muted mb-2">
-                  {item.video?.thumbnailUrl ? (
+                  {item.thumbnailUrl ? (
                     <img
-                      src={item.video.thumbnailUrl}
-                      alt={item.video.title}
+                      src={item.thumbnailUrl}
+                      alt={item.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                     />
                   ) : (
@@ -209,8 +220,14 @@ function ContinueWatchingSection() {
                       }}
                     />
                   </div>
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Play className="w-6 h-6 text-white" fill="white" />
+                    </div>
+                  </div>
                 </div>
-                <h4 className="text-sm font-medium line-clamp-2">{item.video?.title}</h4>
+                <h4 className="text-sm font-medium line-clamp-2">{item.title}</h4>
+                <p className="text-xs text-muted-foreground">{item.channelName}</p>
               </div>
             </Link>
           ))}
@@ -222,12 +239,12 @@ function ContinueWatchingSection() {
 }
 
 export default function Home() {
-  const { user, loading, isAuthenticated } = useAuth();
+  const { user, loading } = useAuth();
+  const sessionId = useMemo(() => getSessionId(), []);
 
-  // Fetch YouTube suggestions
+  // Fetch YouTube suggestions (works without auth)
   const { data: suggestions, isLoading: suggestionsLoading } = trpc.youtube.suggestions.useQuery(
-    { language: "pt", country: "BR" },
-    { enabled: isAuthenticated }
+    { sessionId, language: "pt", country: "BR" }
   );
 
   if (loading) {
@@ -241,49 +258,6 @@ export default function Home() {
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5">
-        <div className="max-w-md w-full mx-4 text-center space-y-8">
-          <div className="space-y-4">
-            <div className="w-20 h-20 mx-auto rounded-2xl bg-primary flex items-center justify-center">
-              <Play className="w-12 h-12 text-primary-foreground" fill="currentColor" />
-            </div>
-            <h1 className="text-4xl font-bold text-foreground">SmartTube Desktop</h1>
-            <p className="text-lg text-muted-foreground">
-              Plataforma profissional de reprodução de vídeos com recursos avançados de IA
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-left">
-              <div className="p-4 rounded-lg bg-card border border-border">
-                <h3 className="font-semibold text-sm mb-1">Busca YouTube</h3>
-                <p className="text-xs text-muted-foreground">Busque e assista vídeos diretamente</p>
-              </div>
-              <div className="p-4 rounded-lg bg-card border border-border">
-                <h3 className="font-semibold text-sm mb-1">Sugestões IA</h3>
-                <p className="text-xs text-muted-foreground">Recomendações baseadas no seu histórico</p>
-              </div>
-              <div className="p-4 rounded-lg bg-card border border-border">
-                <h3 className="font-semibold text-sm mb-1">SponsorBlock</h3>
-                <p className="text-xs text-muted-foreground">Pule segmentos automaticamente</p>
-              </div>
-              <div className="p-4 rounded-lg bg-card border border-border">
-                <h3 className="font-semibold text-sm mb-1">Playlists</h3>
-                <p className="text-xs text-muted-foreground">Organize seus vídeos facilmente</p>
-              </div>
-            </div>
-          </div>
-
-          <Button asChild size="lg" className="w-full">
-            <a href={getLoginUrl()}>Entrar para Começar</a>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <VideoLayout>
       <div className="h-full overflow-y-auto">
@@ -291,8 +265,8 @@ export default function Home() {
           {/* Header */}
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <h1 className="text-2xl font-bold text-foreground">
-                Olá, {user?.name?.split(" ")[0]}!
+              <h1 className="text-3xl font-bold text-foreground">
+                {user ? `Olá, ${user.name?.split(" ")[0]}!` : "SmartTube Desktop"}
               </h1>
               <p className="text-muted-foreground">
                 {suggestions?.basedOnHistory
@@ -309,29 +283,23 @@ export default function Home() {
           </div>
 
           {/* Quick Actions */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <Link href="/search">
               <Button variant="outline" className="w-full h-16 flex-col gap-1">
                 <Search className="w-5 h-5" />
                 <span className="text-xs">Buscar</span>
               </Button>
             </Link>
-            <Link href="/library">
-              <Button variant="outline" className="w-full h-16 flex-col gap-1">
-                <Upload className="w-5 h-5" />
-                <span className="text-xs">Biblioteca</span>
-              </Button>
-            </Link>
-            <Link href="/playlists">
-              <Button variant="outline" className="w-full h-16 flex-col gap-1">
-                <Play className="w-5 h-5" />
-                <span className="text-xs">Playlists</span>
-              </Button>
-            </Link>
             <Link href="/history">
               <Button variant="outline" className="w-full h-16 flex-col gap-1">
                 <History className="w-5 h-5" />
                 <span className="text-xs">Histórico</span>
+              </Button>
+            </Link>
+            <Link href="/settings">
+              <Button variant="outline" className="w-full h-16 flex-col gap-1">
+                <TrendingUp className="w-5 h-5" />
+                <span className="text-xs">Configurações</span>
               </Button>
             </Link>
           </div>
@@ -363,7 +331,7 @@ export default function Home() {
             </div>
           )}
 
-          {suggestions?.sections.map((section, index) => (
+          {suggestions?.sections.map((section: any, index: number) => (
             <SuggestionSection
               key={`${section.category}-${index}`}
               category={section.category}

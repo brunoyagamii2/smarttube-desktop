@@ -1,155 +1,219 @@
+import { useMemo } from "react";
 import VideoLayout from "@/components/VideoLayout";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Play, Clock } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Play, History as HistoryIcon, Clock, CheckCircle2 } from "lucide-react";
 import { Link } from "wouter";
 
+function getSessionId(): string {
+  let sessionId = localStorage.getItem("smarttube_session_id");
+  if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    localStorage.setItem("smarttube_session_id", sessionId);
+  }
+  return sessionId;
+}
+
+function formatDuration(seconds: number): string {
+  if (!seconds) return "";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function formatTimeAgo(dateStr: string | Date): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return "Agora mesmo";
+  if (minutes < 60) return `${minutes} min atrás`;
+  if (hours < 24) return `${hours}h atrás`;
+  if (days < 7) return `${days} dias atrás`;
+  return date.toLocaleDateString("pt-BR");
+}
+
 export default function History() {
-  const { data: history, isLoading } = trpc.history.list.useQuery({ limit: 50 });
+  const sessionId = useMemo(() => getSessionId(), []);
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
+  const { data: history, isLoading } = trpc.youtubeHistory.list.useQuery({
+    sessionId,
+    limit: 100,
+  });
 
-  const formatDate = (date: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - new Date(date).getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(hours / 24);
+  // Group history by date
+  const groupedHistory = useMemo(() => {
+    if (!history) return {};
+    const groups: Record<string, any[]> = {};
+    
+    history.forEach((item: any) => {
+      const date = new Date(item.lastWatchedAt);
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
 
-    if (hours < 1) return "Agora mesmo";
-    if (hours < 24) return `${hours}h atrás`;
-    if (days < 7) return `${days}d atrás`;
-    return new Date(date).toLocaleDateString();
-  };
+      let key: string;
+      if (date.toDateString() === today.toDateString()) {
+        key = "Hoje";
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        key = "Ontem";
+      } else {
+        key = date.toLocaleDateString("pt-BR", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+        });
+      }
+
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(item);
+    });
+
+    return groups;
+  }, [history]);
+
+  if (isLoading) {
+    return (
+      <VideoLayout>
+        <div className="h-full overflow-y-auto">
+          <div className="container py-8 space-y-6 max-w-[1200px]">
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+            <div className="space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex gap-4">
+                  <Skeleton className="w-48 h-28 rounded-lg flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                    <Skeleton className="h-3 w-1/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </VideoLayout>
+    );
+  }
 
   return (
     <VideoLayout>
       <div className="h-full overflow-y-auto">
-        <div className="container py-8 space-y-6">
+        <div className="container py-8 space-y-6 max-w-[1200px]">
           {/* Header */}
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Histórico de Reprodução</h1>
-            <p className="text-muted-foreground">
-              {history?.length || 0} vídeos assistidos
-            </p>
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-3">
+                <HistoryIcon className="w-7 h-7 text-primary" />
+                <h1 className="text-3xl font-bold text-foreground">Histórico</h1>
+              </div>
+              <p className="text-muted-foreground">
+                {history?.length || 0} vídeos assistidos
+              </p>
+            </div>
           </div>
 
           {/* History List */}
-          {isLoading ? (
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <Card key={i} className="overflow-hidden">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-48 h-28 bg-muted rounded animate-pulse" />
-                      <div className="flex-1 space-y-2">
-                        <div className="h-4 bg-muted rounded animate-pulse" />
-                        <div className="h-3 bg-muted rounded w-2/3 animate-pulse" />
-                        <div className="h-2 bg-muted rounded w-full animate-pulse" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : history && history.length > 0 ? (
-            <div className="space-y-4">
-              {history.map((item) => {
-                const progress = (item.currentTime / item.duration) * 100;
-                const video = item.video;
+          {history && history.length > 0 ? (
+            <ScrollArea className="h-[calc(100vh-200px)]">
+              <div className="space-y-8 pr-4">
+                {Object.entries(groupedHistory).map(([dateGroup, items]) => (
+                  <div key={dateGroup} className="space-y-3">
+                    <h2 className="text-lg font-semibold text-foreground sticky top-0 bg-background py-2 z-10">
+                      {dateGroup}
+                    </h2>
+                    <div className="space-y-2">
+                      {items.map((item: any) => (
+                        <Link key={item.id} href={`/youtube/${item.youtubeVideoId}`}>
+                          <Card className="overflow-hidden hover:bg-accent/50 transition-colors cursor-pointer">
+                            <CardContent className="p-3">
+                              <div className="flex items-center gap-4">
+                                {/* Thumbnail */}
+                                <div className="relative w-48 h-28 bg-muted rounded-lg flex-shrink-0 overflow-hidden">
+                                  {item.thumbnailUrl ? (
+                                    <img
+                                      src={item.thumbnailUrl}
+                                      alt={item.title}
+                                      className="w-full h-full object-cover"
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                      <Play className="w-8 h-8 text-muted-foreground" />
+                                    </div>
+                                  )}
+                                  {item.duration > 0 && (
+                                    <span className="absolute bottom-1 right-1 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded font-medium">
+                                      {formatDuration(item.duration)}
+                                    </span>
+                                  )}
+                                  {/* Progress bar */}
+                                  {item.duration > 0 && item.currentTime > 0 && (
+                                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/30">
+                                      <div
+                                        className="h-full bg-primary"
+                                        style={{
+                                          width: `${(item.currentTime / item.duration) * 100}%`,
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
 
-                if (!video) return null;
-
-                return (
-                  <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-4">
-                        <Link href={`/watch/${video.id}`} className="flex-shrink-0">
-                          <div className="w-48 h-28 bg-muted rounded relative group cursor-pointer">
-                            {video.thumbnailUrl ? (
-                              <img
-                                src={video.thumbnailUrl}
-                                alt={video.title}
-                                className="w-full h-full object-cover rounded"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Play className="w-12 h-12 text-muted-foreground" />
+                                {/* Info */}
+                                <div className="flex-1 min-w-0 space-y-1">
+                                  <h3 className="font-medium text-sm line-clamp-2 text-foreground">
+                                    {item.title}
+                                  </h3>
+                                  <span className="text-xs text-muted-foreground">
+                                    {item.channelName || "Canal desconhecido"}
+                                  </span>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Clock className="w-3 h-3" />
+                                    <span>{formatTimeAgo(item.lastWatchedAt)}</span>
+                                    {item.completed && (
+                                      <Badge variant="secondary" className="text-xs py-0">
+                                        <CheckCircle2 className="w-3 h-3 mr-1" />
+                                        Assistido
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
-                            )}
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                              <Play className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </div>
-                            {!item.completed && (
-                              <div className="absolute bottom-1 left-1 right-1">
-                                <Progress value={progress} className="h-1" />
-                              </div>
-                            )}
-                          </div>
+                            </CardContent>
+                          </Card>
                         </Link>
-
-                        <div className="flex-1 min-w-0 space-y-2">
-                          <Link href={`/watch/${video.id}`}>
-                            <h3 className="font-semibold text-lg line-clamp-2 hover:text-primary cursor-pointer">
-                              {video.title}
-                            </h3>
-                          </Link>
-
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span>{video.views} visualizações</span>
-                            <span>•</span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              {formatDate(item.lastWatchedAt)}
-                            </span>
-                          </div>
-
-                          {item.completed ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full bg-green-500" />
-                              <span className="text-sm text-muted-foreground">Concluído</span>
-                            </div>
-                          ) : (
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-muted-foreground">
-                                  {formatTime(item.currentTime)} / {formatTime(item.duration)}
-                                </span>
-                                <span className="text-muted-foreground">
-                                  {Math.round(progress)}%
-                                </span>
-                              </div>
-                              <Progress value={progress} className="h-2" />
-                            </div>
-                          )}
-
-                          <Button asChild size="sm" variant="outline">
-                            <Link href={`/watch/${video.id}`}>
-                              {item.completed ? "Assistir novamente" : "Continuar assistindo"}
-                            </Link>
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
           ) : (
-            <div className="text-center py-12">
-              <Clock className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Nenhum histórico</h3>
-              <p className="text-muted-foreground mb-4">
-                Comece assistindo vídeos para ver seu histórico aqui
+            <div className="text-center py-16 space-y-4">
+              <HistoryIcon className="w-20 h-20 mx-auto text-muted-foreground/30" />
+              <h3 className="text-xl font-semibold text-foreground">Nenhum vídeo assistido</h3>
+              <p className="text-muted-foreground max-w-md mx-auto">
+                Seu histórico de reprodução aparecerá aqui. Comece assistindo vídeos para ver seu histórico.
               </p>
-              <Button asChild>
-                <Link href="/library">Ir para Biblioteca</Link>
-              </Button>
+              <Link href="/search">
+                <Button>
+                  <Play className="w-4 h-4 mr-2" />
+                  Buscar Vídeos
+                </Button>
+              </Link>
             </div>
           )}
         </div>

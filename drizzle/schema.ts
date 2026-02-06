@@ -124,6 +124,27 @@ export const videoTranscriptions = mysqlTable("videoTranscriptions", {
 export type VideoTranscription = typeof videoTranscriptions.$inferSelect;
 export type InsertVideoTranscription = typeof videoTranscriptions.$inferInsert;
 
+/**
+ * YouTube watch history - tracks YouTube video playback (no auth required)
+ */
+export const youtubeHistory = mysqlTable("youtubeHistory", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: varchar("sessionId", { length: 128 }).notNull(),
+  youtubeVideoId: varchar("youtubeVideoId", { length: 20 }).notNull(),
+  title: varchar("title", { length: 500 }).notNull(),
+  channelName: varchar("channelName", { length: 255 }),
+  channelId: varchar("channelId", { length: 64 }),
+  thumbnailUrl: text("thumbnailUrl"),
+  duration: int("duration").notNull().default(0),
+  currentTime: float("currentTime").notNull().default(0),
+  completed: boolean("completed").default(false).notNull(),
+  lastWatchedAt: timestamp("lastWatchedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type YouTubeHistory = typeof youtubeHistory.$inferSelect;
+export type InsertYouTubeHistory = typeof youtubeHistory.$inferInsert;
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   videos: many(videos),

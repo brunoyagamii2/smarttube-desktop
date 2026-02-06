@@ -4,23 +4,13 @@ import VideoLayout from "@/components/VideoLayout";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Play, Plus, GripVertical, Trash2, ArrowLeft } from "lucide-react";
+import { Play, GripVertical, Trash2, ArrowLeft, ListVideo } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
 
 export default function PlaylistDetail() {
   const [, params] = useRoute("/playlist/:id");
   const playlistId = params?.id ? parseInt(params.id) : 0;
-  const [addVideoDialogOpen, setAddVideoDialogOpen] = useState(false);
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
 
   const utils = trpc.useUtils();
@@ -37,29 +27,14 @@ export default function PlaylistDetail() {
     { enabled: playlistId > 0 }
   );
 
-  // Fetch all videos for adding
-  const { data: allVideos } = trpc.videos.list.useQuery({ limit: 100 });
-
   // Remove video mutation
   const removeVideoMutation = trpc.playlists.removeVideo.useMutation({
     onSuccess: () => {
       toast.success("Vídeo removido da playlist!");
       utils.playlists.getItems.invalidate({ playlistId });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error("Erro ao remover vídeo: " + error.message);
-    },
-  });
-
-  // Add video mutation
-  const addVideoMutation = trpc.playlists.addVideo.useMutation({
-    onSuccess: () => {
-      toast.success("Vídeo adicionado à playlist!");
-      setAddVideoDialogOpen(false);
-      utils.playlists.getItems.invalidate({ playlistId });
-    },
-    onError: (error) => {
-      toast.error("Erro ao adicionar vídeo: " + error.message);
     },
   });
 
@@ -68,7 +43,7 @@ export default function PlaylistDetail() {
     onSuccess: () => {
       utils.playlists.getItems.invalidate({ playlistId });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast.error("Erro ao reordenar: " + error.message);
     },
   });
@@ -79,15 +54,6 @@ export default function PlaylistDetail() {
     }
   };
 
-  const handleAddVideo = (videoId: number) => {
-    const nextPosition = playlistItems?.length || 0;
-    addVideoMutation.mutate({
-      playlistId,
-      videoId,
-      position: nextPosition,
-    });
-  };
-
   const handleDragStart = (index: number) => {
     setDraggedItem(index);
   };
@@ -95,19 +61,12 @@ export default function PlaylistDetail() {
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     if (draggedItem === null || draggedItem === index) return;
-
-    const items = [...(playlistItems || [])];
-    const draggedContent = items[draggedItem];
-    items.splice(draggedItem, 1);
-    items.splice(index, 0, draggedContent!);
-
-    setDraggedItem(index);
   };
 
   const handleDragEnd = () => {
     if (draggedItem === null || !playlistItems) return;
 
-    const reorderedItems = playlistItems.map((item, index) => ({
+    const reorderedItems = playlistItems.map((item: any, index: number) => ({
       id: item.id,
       position: index,
     }));
@@ -149,10 +108,6 @@ export default function PlaylistDetail() {
     );
   }
 
-  const availableVideos = allVideos?.filter(
-    (video) => !playlistItems?.some((item) => item.videoId === video.id)
-  );
-
   return (
     <VideoLayout>
       <div className="h-full overflow-y-auto">
@@ -176,78 +131,13 @@ export default function PlaylistDetail() {
                   {playlistItems?.length || 0} vídeos
                 </p>
               </div>
-
-              <Dialog open={addVideoDialogOpen} onOpenChange={setAddVideoDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Adicionar Vídeos
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Adicionar Vídeos à Playlist</DialogTitle>
-                    <DialogDescription>
-                      Selecione os vídeos que deseja adicionar
-                    </DialogDescription>
-                  </DialogHeader>
-                  <ScrollArea className="h-[400px]">
-                    {availableVideos && availableVideos.length > 0 ? (
-                      <div className="space-y-2">
-                        {availableVideos.map((video) => (
-                          <Card key={video.id} className="overflow-hidden">
-                            <CardContent className="p-4">
-                              <div className="flex items-center gap-4">
-                                <div className="w-32 h-20 bg-muted rounded flex-shrink-0">
-                                  {video.thumbnailUrl ? (
-                                    <img
-                                      src={video.thumbnailUrl}
-                                      alt={video.title}
-                                      className="w-full h-full object-cover rounded"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                      <Play className="w-8 h-8 text-muted-foreground" />
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="font-semibold text-sm line-clamp-2">
-                                    {video.title}
-                                  </h4>
-                                  <p className="text-xs text-muted-foreground">
-                                    {video.views} visualizações
-                                  </p>
-                                </div>
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleAddVideo(video.id)}
-                                  disabled={addVideoMutation.isPending}
-                                >
-                                  Adicionar
-                                </Button>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <p className="text-muted-foreground">
-                          Todos os vídeos já foram adicionados ou não há vídeos disponíveis
-                        </p>
-                      </div>
-                    )}
-                  </ScrollArea>
-                </DialogContent>
-              </Dialog>
             </div>
           </div>
 
           {/* Playlist Items */}
           {playlistItems && playlistItems.length > 0 ? (
             <div className="space-y-2">
-              {playlistItems.map((item, index) => (
+              {playlistItems.map((item: any, index: number) => (
                 <Card
                   key={item.id}
                   draggable
@@ -264,8 +154,8 @@ export default function PlaylistDetail() {
                         {index + 1}
                       </span>
 
-                      <Link href={`/watch/${item.video?.id}`} className="flex-1">
-                        <div className="flex items-center gap-4 cursor-pointer">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-4">
                           <div className="w-40 h-24 bg-muted rounded flex-shrink-0">
                             {item.video?.thumbnailUrl ? (
                               <img
@@ -281,14 +171,14 @@ export default function PlaylistDetail() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <h4 className="font-semibold line-clamp-2">
-                              {item.video?.title}
+                              {item.video?.title || "Vídeo"}
                             </h4>
                             <p className="text-sm text-muted-foreground">
-                              {item.video?.views} visualizações
+                              {item.video?.views || 0} visualizações
                             </p>
                           </div>
                         </div>
-                      </Link>
+                      </div>
 
                       <Button
                         variant="ghost"
@@ -305,15 +195,11 @@ export default function PlaylistDetail() {
             </div>
           ) : (
             <div className="text-center py-12">
-              <Play className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+              <ListVideo className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">Playlist vazia</h3>
               <p className="text-muted-foreground mb-4">
-                Adicione vídeos para começar a montar sua playlist
+                Esta playlist ainda não possui vídeos
               </p>
-              <Button onClick={() => setAddVideoDialogOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Adicionar Vídeos
-              </Button>
             </div>
           )}
         </div>
