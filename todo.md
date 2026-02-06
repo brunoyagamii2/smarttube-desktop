@@ -56,3 +56,12 @@
 
 ## Bugs
 - [x] Tabelas do banco de dados não foram criadas (videos, playlists, playlistItems, watchHistory, userSettings, videoTranscriptions)
+
+## Novas Funcionalidades
+- [x] Busca de vídeos do YouTube integrada (como no SmartTube Android)
+- [x] Sistema de sugestões de vídeos baseado no histórico do usuário (IA com LLM)
+- [x] Feed de vídeos recomendados na página inicial
+- [x] Reprodução direta de vídeos do YouTube via embed
+- [x] Vídeos relacionados na sidebar durante reprodução
+- [x] Tema escuro com cores vermelhas (estilo SmartTube)
+- [x] Testes para procedures YouTube e SponsorBlock

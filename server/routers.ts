@@ -6,7 +6,58 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
 import { generateImage } from "./_core/imageGeneration";
 import { transcribeAudio } from "./_core/voiceTranscription";
+import { callDataApi } from "./_core/dataApi";
+import { invokeLLM } from "./_core/llm";
 import * as db from "./db";
+
+// ============= YouTube API Types =============
+interface YouTubeVideoResult {
+  type: string;
+  video?: {
+    videoId: string;
+    title: string;
+    author?: {
+      title: string;
+      channelId: string;
+      avatar?: Array<{ url: string; width: number; height: number }>;
+      badges?: Array<{ text: string; type: string }>;
+    };
+    thumbnails?: Array<{ url: string; width: number; height: number }>;
+    movingThumbnails?: Array<{ url: string; width: number; height: number }>;
+    lengthSeconds?: number;
+    publishedTimeText?: string;
+    stats?: { views: number };
+    descriptionSnippet?: string;
+    badges?: string[];
+    isLiveNow?: boolean;
+  };
+}
+
+interface YouTubeSearchResponse {
+  contents: YouTubeVideoResult[];
+  cursorNext?: string;
+  estimatedResults?: number;
+  refinements?: string[];
+}
+
+function formatYouTubeVideo(item: YouTubeVideoResult) {
+  const v = item.video;
+  if (!v) return null;
+  return {
+    videoId: v.videoId,
+    title: v.title || "Sem título",
+    channelName: v.author?.title || "Canal desconhecido",
+    channelId: v.author?.channelId || "",
+    channelAvatar: v.author?.avatar?.[0]?.url || "",
+    channelVerified: v.author?.badges?.some(b => b.type === "VERIFIED_CHANNEL") || false,
+    thumbnailUrl: v.thumbnails?.[v.thumbnails.length - 1]?.url || v.thumbnails?.[0]?.url || "",
+    duration: v.lengthSeconds || 0,
+    publishedTimeText: v.publishedTimeText || "",
+    views: v.stats?.views || 0,
+    description: v.descriptionSnippet || "",
+    isLive: v.isLiveNow || false,
+  };
+}
 
 export const appRouter = router({
   system: systemRouter,
@@ -304,20 +355,222 @@ export const appRouter = router({
         categories: z.array(z.string()).optional(),
       }))
       .query(async ({ input }) => {
-        // Call SponsorBlock API
         const categories = input.categories || ["sponsor", "intro", "outro", "selfpromo"];
         const url = `https://sponsor.ajay.app/api/skipSegments?videoID=${input.videoId}&categories=${JSON.stringify(categories)}`;
-        
         try {
           const response = await fetch(url);
-          if (!response.ok) {
-            return [];
-          }
+          if (!response.ok) return [];
           const data = await response.json();
           return data;
         } catch (error) {
           console.error("SponsorBlock API error:", error);
           return [];
+        }
+      }),
+  }),
+
+  youtube: router({
+    search: protectedProcedure
+      .input(z.object({
+        query: z.string().min(1),
+        cursor: z.string().optional(),
+        language: z.string().optional().default("pt"),
+        country: z.string().optional().default("BR"),
+      }))
+      .query(async ({ input }) => {
+        try {
+          const result = await callDataApi("Youtube/search", {
+            query: {
+              q: input.query,
+              hl: input.language,
+              gl: input.country,
+              ...(input.cursor ? { cursor: input.cursor } : {}),
+            },
+          }) as YouTubeSearchResponse;
+
+          const videos = (result.contents || [])
+            .filter((item) => item.type === "video" && item.video)
+            .map(formatYouTubeVideo)
+            .filter(Boolean);
+
+          return {
+            videos,
+            cursorNext: result.cursorNext || null,
+            estimatedResults: result.estimatedResults || 0,
+            refinements: result.refinements || [],
+          };
+        } catch (error) {
+          console.error("YouTube search error:", error);
+          return { videos: [], cursorNext: null, estimatedResults: 0, refinements: [] };
+        }
+      }),
+
+    trending: protectedProcedure
+      .input(z.object({
+        language: z.string().optional().default("pt"),
+        country: z.string().optional().default("BR"),
+      }))
+      .query(async ({ input }) => {
+        try {
+          // Search for trending/popular content
+          const result = await callDataApi("Youtube/search", {
+            query: {
+              q: "trending",
+              hl: input.language,
+              gl: input.country,
+            },
+          }) as YouTubeSearchResponse;
+
+          const videos = (result.contents || [])
+            .filter((item) => item.type === "video" && item.video)
+            .map(formatYouTubeVideo)
+            .filter(Boolean);
+
+          return { videos };
+        } catch (error) {
+          console.error("YouTube trending error:", error);
+          return { videos: [] };
+        }
+      }),
+
+    channelVideos: protectedProcedure
+      .input(z.object({
+        channelId: z.string(),
+        cursor: z.string().optional(),
+        language: z.string().optional().default("pt"),
+        country: z.string().optional().default("BR"),
+      }))
+      .query(async ({ input }) => {
+        try {
+          const result = await callDataApi("Youtube/get_channel_videos", {
+            query: {
+              id: input.channelId,
+              filter: "videos_latest",
+              hl: input.language,
+              gl: input.country,
+              ...(input.cursor ? { cursor: input.cursor } : {}),
+            },
+          }) as YouTubeSearchResponse;
+
+          const videos = (result.contents || [])
+            .filter((item) => item.type === "video" && item.video)
+            .map(formatYouTubeVideo)
+            .filter(Boolean);
+
+          return {
+            videos,
+            cursorNext: result.cursorNext || null,
+          };
+        } catch (error) {
+          console.error("YouTube channel videos error:", error);
+          return { videos: [], cursorNext: null };
+        }
+      }),
+
+    suggestions: protectedProcedure
+      .input(z.object({
+        language: z.string().optional().default("pt"),
+        country: z.string().optional().default("BR"),
+      }))
+      .query(async ({ ctx, input }) => {
+        try {
+          // Get user's watch history to build suggestions
+          const history = await db.getWatchHistory(ctx.user.id, 20);
+          
+          // Extract video titles from history for context
+          const watchedTitles = history
+            .filter(h => h.video)
+            .map(h => h.video?.title)
+            .filter(Boolean)
+            .slice(0, 10);
+
+          let searchQueries: string[] = [];
+
+          if (watchedTitles.length > 0) {
+            // Use LLM to generate smart search queries based on history
+            try {
+              const response = await invokeLLM({
+                messages: [
+                  {
+                    role: "system",
+                    content: "You are a video recommendation engine. Given a list of recently watched video titles, generate 4 diverse YouTube search queries that the user would likely enjoy. Return ONLY a JSON array of strings, nothing else. Each query should be 2-5 words. Mix between similar content and discovery.",
+                  },
+                  {
+                    role: "user",
+                    content: `Recently watched videos:\n${watchedTitles.join("\n")}\n\nGenerate 4 search queries in ${input.language === "pt" ? "Portuguese" : "English"}:`,
+                  },
+                ],
+                response_format: {
+                  type: "json_schema",
+                  json_schema: {
+                    name: "search_queries",
+                    strict: true,
+                    schema: {
+                      type: "object",
+                      properties: {
+                        queries: {
+                          type: "array",
+                          items: { type: "string" },
+                        },
+                      },
+                      required: ["queries"],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+              });
+
+              const rawContent = response.choices[0]?.message?.content;
+              const contentStr = typeof rawContent === "string" ? rawContent : "{}";
+              const parsed = JSON.parse(contentStr);
+              searchQueries = parsed.queries || [];
+            } catch (llmError) {
+              console.error("LLM suggestion error:", llmError);
+              // Fallback: use watched titles directly
+              searchQueries = watchedTitles.slice(0, 4) as string[];
+            }
+          } else {
+            // No history - use default popular categories
+            searchQueries = [
+              "melhores vídeos tecnologia 2026",
+              "tutoriais programação",
+              "música para estudar",
+              "documentários interessantes",
+            ];
+          }
+
+          // Fetch videos for each query in parallel
+          const allResults = await Promise.all(
+            searchQueries.slice(0, 4).map(async (query) => {
+              try {
+                const result = await callDataApi("Youtube/search", {
+                  query: {
+                    q: query,
+                    hl: input.language,
+                    gl: input.country,
+                  },
+                }) as YouTubeSearchResponse;
+
+                const videos = (result.contents || [])
+                  .filter((item) => item.type === "video" && item.video)
+                  .map(formatYouTubeVideo)
+                  .filter(Boolean)
+                  .slice(0, 6);
+
+                return { category: query, videos };
+              } catch {
+                return { category: query, videos: [] };
+              }
+            })
+          );
+
+          return {
+            sections: allResults.filter(r => r.videos.length > 0),
+            basedOnHistory: watchedTitles.length > 0,
+          };
+        } catch (error) {
+          console.error("YouTube suggestions error:", error);
+          return { sections: [], basedOnHistory: false };
         }
       }),
   }),

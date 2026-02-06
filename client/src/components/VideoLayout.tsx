@@ -19,6 +19,7 @@ import {
   Settings, 
   LogOut,
   Play,
+  Search,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -42,6 +43,7 @@ export default function VideoLayout({ children }: VideoLayoutProps) {
 
   const navItems = [
     { icon: Home, label: "Início", path: "/" },
+    { icon: Search, label: "Buscar YouTube", path: "/search" },
     { icon: Video, label: "Biblioteca", path: "/library" },
     { icon: ListVideo, label: "Playlists", path: "/playlists" },
     { icon: History, label: "Histórico", path: "/history" },
