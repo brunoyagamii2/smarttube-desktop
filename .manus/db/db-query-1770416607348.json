@@ -1,0 +1,22 @@
+{
+  "query": "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE();",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2r3f3cWMTbxLtDs.df5e41447897 --database T8AWmRE7wx5ioxNGuemY3B --execute SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE();",
+  "rows": [
+    {
+      "TABLE_NAME": "__drizzle_migrations"
+    },
+    {
+      "TABLE_NAME": "users"
+    },
+    {
+      "TABLE_NAME": "playlistItems"
+    },
+    {
+      "TABLE_NAME": "playlists"
+    }
+  ],
+  "messages": [],
+  "stdout": "TABLE_NAME\n__drizzle_migrations\nusers\nplaylistItems\nplaylists\n",
+  "stderr": "",
+  "execution_time_ms": 55
+}

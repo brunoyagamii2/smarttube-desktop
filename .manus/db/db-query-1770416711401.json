@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS `userSettings` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`userId` int NOT NULL,\n\t`defaultPlaybackSpeed` float NOT NULL DEFAULT 1,\n\t`defaultQuality` varchar(20) DEFAULT 'auto',\n\t`autoplay` boolean NOT NULL DEFAULT true,\n\t`sponsorBlockEnabled` boolean NOT NULL DEFAULT true,\n\t`sponsorBlockCategories` json,\n\t`autoGenerateCaptions` boolean NOT NULL DEFAULT false,\n\t`theme` varchar(10) NOT NULL DEFAULT 'dark',\n\t`createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n\t`updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n\tPRIMARY KEY(`id`),\n\tUNIQUE KEY `userSettings_userId_unique` (`userId`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2r3f3cWMTbxLtDs.df5e41447897 --database T8AWmRE7wx5ioxNGuemY3B --execute CREATE TABLE IF NOT EXISTS `userSettings` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`userId` int NOT NULL,\n\t`defaultPlaybackSpeed` float NOT NULL DEFAULT 1,\n\t`defaultQuality` varchar(20) DEFAULT 'auto',\n\t`autoplay` boolean NOT NULL DEFAULT true,\n\t`sponsorBlockEnabled` boolean NOT NULL DEFAULT true,\n\t`sponsorBlockCategories` json,\n\t`autoGenerateCaptions` boolean NOT NULL DEFAULT false,\n\t`theme` varchar(10) NOT NULL DEFAULT 'dark',\n\t`createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n\t`updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n\tPRIMARY KEY(`id`),\n\tUNIQUE KEY `userSettings_userId_unique` (`userId`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 177
+}

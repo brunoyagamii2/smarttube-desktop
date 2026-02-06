@@ -53,3 +53,6 @@
 ## Testes
 - [x] Testes unitários para procedures críticas
 - [x] Testes de integração do player
+
+## Bugs
+- [x] Tabelas do banco de dados não foram criadas (videos, playlists, playlistItems, watchHistory, userSettings, videoTranscriptions)

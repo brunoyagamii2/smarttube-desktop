@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE IF NOT EXISTS `videoTranscriptions` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`videoId` int NOT NULL,\n\t`language` varchar(10) NOT NULL,\n\t`transcription` text NOT NULL,\n\t`generatedBy` varchar(50) NOT NULL DEFAULT 'whisper',\n\t`createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n\tPRIMARY KEY(`id`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2r3f3cWMTbxLtDs.df5e41447897 --database T8AWmRE7wx5ioxNGuemY3B --execute CREATE TABLE IF NOT EXISTS `videoTranscriptions` (\n\t`id` int AUTO_INCREMENT NOT NULL,\n\t`videoId` int NOT NULL,\n\t`language` varchar(10) NOT NULL,\n\t`transcription` text NOT NULL,\n\t`generatedBy` varchar(50) NOT NULL DEFAULT 'whisper',\n\t`createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,\n\tPRIMARY KEY(`id`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 177
+}
