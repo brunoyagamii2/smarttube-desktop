@@ -10,13 +10,19 @@ import {
   userSettings,
   videoTranscriptions,
   youtubeHistory,
+  youtubePlaylistItems,
+  youtubeSubscriptions,
+  autoplayQueue,
   InsertVideo,
   InsertPlaylist,
   InsertPlaylistItem,
   InsertWatchHistory,
   InsertUserSettings,
   InsertVideoTranscription,
-  InsertYouTubeHistory
+  InsertYouTubeHistory,
+  InsertYouTubePlaylistItem,
+  InsertYouTubeSubscription,
+  InsertAutoplayQueue
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -490,4 +496,181 @@ export async function getRecentYouTubeSearchTerms(sessionId: string, limit = 10)
     .limit(limit);
 
   return results.map(r => r.title);
+}
+
+// ============= YOUTUBE PLAYLIST ITEM FUNCTIONS =============
+
+export async function addYouTubeVideoToPlaylist(item: InsertYouTubePlaylistItem) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.insert(youtubePlaylistItems).values(item);
+}
+
+export async function getYouTubePlaylistItems(playlistId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db
+    .select()
+    .from(youtubePlaylistItems)
+    .where(eq(youtubePlaylistItems.playlistId, playlistId))
+    .orderBy(youtubePlaylistItems.position);
+}
+
+export async function removeYouTubeVideoFromPlaylist(itemId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.delete(youtubePlaylistItems).where(eq(youtubePlaylistItems.id, itemId));
+}
+
+export async function reorderYouTubePlaylistItems(playlistId: number, itemPositions: { id: number; position: number }[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  for (const item of itemPositions) {
+    await db
+      .update(youtubePlaylistItems)
+      .set({ position: item.position })
+      .where(
+        and(
+          eq(youtubePlaylistItems.id, item.id),
+          eq(youtubePlaylistItems.playlistId, playlistId)
+        )
+      );
+  }
+}
+
+// ============= YOUTUBE SUBSCRIPTION FUNCTIONS =============
+
+export async function subscribeToChannel(subscription: InsertYouTubeSubscription) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Check if already subscribed
+  const existing = await db
+    .select()
+    .from(youtubeSubscriptions)
+    .where(
+      and(
+        eq(youtubeSubscriptions.sessionId, subscription.sessionId),
+        eq(youtubeSubscriptions.channelId, subscription.channelId)
+      )
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    return existing[0];
+  }
+
+  return await db.insert(youtubeSubscriptions).values(subscription);
+}
+
+export async function unsubscribeFromChannel(sessionId: string, channelId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db
+    .delete(youtubeSubscriptions)
+    .where(
+      and(
+        eq(youtubeSubscriptions.sessionId, sessionId),
+        eq(youtubeSubscriptions.channelId, channelId)
+      )
+    );
+}
+
+export async function getSubscribedChannels(sessionId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db
+    .select()
+    .from(youtubeSubscriptions)
+    .where(eq(youtubeSubscriptions.sessionId, sessionId))
+    .orderBy(desc(youtubeSubscriptions.subscribedAt));
+}
+
+export async function isSubscribedToChannel(sessionId: string, channelId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db
+    .select()
+    .from(youtubeSubscriptions)
+    .where(
+      and(
+        eq(youtubeSubscriptions.sessionId, sessionId),
+        eq(youtubeSubscriptions.channelId, channelId)
+      )
+    )
+    .limit(1);
+
+  return result.length > 0;
+}
+
+// ============= AUTOPLAY QUEUE FUNCTIONS =============
+
+export async function addToAutoplayQueue(item: InsertAutoplayQueue) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.insert(autoplayQueue).values(item);
+}
+
+export async function getAutoplayQueue(sessionId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db
+    .select()
+    .from(autoplayQueue)
+    .where(eq(autoplayQueue.sessionId, sessionId))
+    .orderBy(autoplayQueue.position);
+}
+
+export async function removeFromAutoplayQueue(itemId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.delete(autoplayQueue).where(eq(autoplayQueue.id, itemId));
+}
+
+export async function clearAutoplayQueue(sessionId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return await db.delete(autoplayQueue).where(eq(autoplayQueue.sessionId, sessionId));
+}
+
+export async function getNextAutoplayVideo(sessionId: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db
+    .select()
+    .from(autoplayQueue)
+    .where(eq(autoplayQueue.sessionId, sessionId))
+    .orderBy(autoplayQueue.position)
+    .limit(1);
+
+  return result[0];
+}
+
+export async function reorderAutoplayQueue(sessionId: string, itemPositions: { id: number; position: number }[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  for (const item of itemPositions) {
+    await db
+      .update(autoplayQueue)
+      .set({ position: item.position })
+      .where(
+        and(
+          eq(autoplayQueue.id, item.id),
+          eq(autoplayQueue.sessionId, sessionId)
+        )
+      );
+  }
 }

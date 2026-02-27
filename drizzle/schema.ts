@@ -163,13 +163,7 @@ export const videosRelations = relations(videos, ({ one, many }) => ({
   transcriptions: many(videoTranscriptions),
 }));
 
-export const playlistsRelations = relations(playlists, ({ one, many }) => ({
-  user: one(users, {
-    fields: [playlists.userId],
-    references: [users.id],
-  }),
-  items: many(playlistItems),
-}));
+
 
 export const playlistItemsRelations = relations(playlistItems, ({ one }) => ({
   playlist: one(playlists, {
@@ -205,4 +199,76 @@ export const videoTranscriptionsRelations = relations(videoTranscriptions, ({ on
     fields: [videoTranscriptions.videoId],
     references: [videos.id],
   }),
+}));
+
+/**
+ * YouTube Playlists - playlists containing YouTube videos
+ */
+export const youtubePlaylistItems = mysqlTable("youtubePlaylistItems", {
+  id: int("id").autoincrement().primaryKey(),
+  playlistId: int("playlistId").notNull(),
+  youtubeVideoId: varchar("youtubeVideoId", { length: 20 }).notNull(),
+  title: varchar("title", { length: 500 }).notNull(),
+  channelName: varchar("channelName", { length: 255 }),
+  channelId: varchar("channelId", { length: 64 }),
+  thumbnailUrl: text("thumbnailUrl"),
+  duration: int("duration").default(0).notNull(),
+  position: int("position").notNull(),
+  addedAt: timestamp("addedAt").defaultNow().notNull(),
+});
+
+export type YouTubePlaylistItem = typeof youtubePlaylistItems.$inferSelect;
+export type InsertYouTubePlaylistItem = typeof youtubePlaylistItems.$inferInsert;
+
+/**
+ * YouTube Channel Subscriptions - user subscriptions to YouTube channels
+ */
+export const youtubeSubscriptions = mysqlTable("youtubeSubscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: varchar("sessionId", { length: 128 }).notNull(),
+  channelId: varchar("channelId", { length: 64 }).notNull(),
+  channelName: varchar("channelName", { length: 255 }).notNull(),
+  channelThumbnail: text("channelThumbnail"),
+  subscribedAt: timestamp("subscribedAt").defaultNow().notNull(),
+  lastVideoCheck: timestamp("lastVideoCheck"),
+});
+
+export type YouTubeSubscription = typeof youtubeSubscriptions.$inferSelect;
+export type InsertYouTubeSubscription = typeof youtubeSubscriptions.$inferInsert;
+
+/**
+ * Autoplay Queue - tracks videos to be played automatically
+ */
+export const autoplayQueue = mysqlTable("autoplayQueue", {
+  id: int("id").autoincrement().primaryKey(),
+  sessionId: varchar("sessionId", { length: 128 }).notNull(),
+  youtubeVideoId: varchar("youtubeVideoId", { length: 20 }).notNull(),
+  title: varchar("title", { length: 500 }).notNull(),
+  channelName: varchar("channelName", { length: 255 }),
+  thumbnailUrl: text("thumbnailUrl"),
+  duration: int("duration").default(0).notNull(),
+  position: int("position").notNull(),
+  source: mysqlEnum("source", ["playlist", "suggestions", "related", "subscriptions"]).notNull(),
+  sourceId: varchar("sourceId", { length: 255 }), // playlist ID or subscription ID
+  addedAt: timestamp("addedAt").defaultNow().notNull(),
+});
+
+export type AutoplayQueue = typeof autoplayQueue.$inferSelect;
+export type InsertAutoplayQueue = typeof autoplayQueue.$inferInsert;
+
+// Relations for new tables
+export const youtubePlaylistItemsRelations = relations(youtubePlaylistItems, ({ one }) => ({
+  playlist: one(playlists, {
+    fields: [youtubePlaylistItems.playlistId],
+    references: [playlists.id],
+  }),
+}));
+
+export const playlistsRelationsUpdated = relations(playlists, ({ one, many }) => ({
+  user: one(users, {
+    fields: [playlists.userId],
+    references: [users.id],
+  }),
+  items: many(playlistItems),
+  youtubeItems: many(youtubePlaylistItems),
 }));

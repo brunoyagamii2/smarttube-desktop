@@ -469,6 +469,163 @@ export const appRouter = router({
         }
       }),
   }),
+  
+  // ============= YOUTUBE PLAYLIST ROUTERS =============
+  youtubePlaylist: router({
+    addVideo: publicProcedure
+      .input(z.object({
+        playlistId: z.number(),
+        youtubeVideoId: z.string(),
+        title: z.string(),
+        channelName: z.string().optional(),
+        channelId: z.string().optional(),
+        thumbnailUrl: z.string().optional(),
+        duration: z.number().default(0),
+      }))
+      .mutation(async ({ input }) => {
+        const maxPosition = await db.getYouTubePlaylistItems(input.playlistId)
+          .then(items => Math.max(...items.map(i => i.position), 0));
+        
+        return await db.addYouTubeVideoToPlaylist({
+          playlistId: input.playlistId,
+          youtubeVideoId: input.youtubeVideoId,
+          title: input.title,
+          channelName: input.channelName,
+          channelId: input.channelId,
+          thumbnailUrl: input.thumbnailUrl,
+          duration: input.duration,
+          position: maxPosition + 1,
+        });
+      }),
+    
+    getItems: publicProcedure
+      .input(z.object({ playlistId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getYouTubePlaylistItems(input.playlistId);
+      }),
+    
+    removeVideo: publicProcedure
+      .input(z.object({ itemId: z.number() }))
+      .mutation(async ({ input }) => {
+        return await db.removeYouTubeVideoFromPlaylist(input.itemId);
+      }),
+    
+    reorder: publicProcedure
+      .input(z.object({
+        playlistId: z.number(),
+        positions: z.array(z.object({ id: z.number(), position: z.number() }))
+      }))
+      .mutation(async ({ input }) => {
+        return await db.reorderYouTubePlaylistItems(input.playlistId, input.positions);
+      }),
+  }),
+  
+  // ============= YOUTUBE SUBSCRIPTION ROUTERS =============
+  youtubeSubscription: router({
+    subscribe: publicProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        channelId: z.string(),
+        channelName: z.string(),
+        channelThumbnail: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return await db.subscribeToChannel({
+          sessionId: input.sessionId,
+          channelId: input.channelId,
+          channelName: input.channelName,
+          channelThumbnail: input.channelThumbnail,
+        });
+      }),
+    
+    unsubscribe: publicProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        channelId: z.string(),
+      }))
+      .mutation(async ({ input }) => {
+        return await db.unsubscribeFromChannel(input.sessionId, input.channelId);
+      }),
+    
+    getSubscribed: publicProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ input }) => {
+        return await db.getSubscribedChannels(input.sessionId);
+      }),
+    
+    isSubscribed: publicProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        channelId: z.string(),
+      }))
+      .query(async ({ input }) => {
+        return await db.isSubscribedToChannel(input.sessionId, input.channelId);
+      }),
+  }),
+  
+  // ============= AUTOPLAY ROUTERS =============
+  autoplay: router({
+    addToQueue: publicProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        youtubeVideoId: z.string(),
+        title: z.string(),
+        channelName: z.string().optional(),
+        thumbnailUrl: z.string().optional(),
+        duration: z.number().default(0),
+        source: z.enum(["playlist", "suggestions", "related", "subscriptions"]),
+        sourceId: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        const queue = await db.getAutoplayQueue(input.sessionId);
+        const maxPosition = Math.max(...queue.map(q => q.position), 0);
+        
+        return await db.addToAutoplayQueue({
+          sessionId: input.sessionId,
+          youtubeVideoId: input.youtubeVideoId,
+          title: input.title,
+          channelName: input.channelName,
+          thumbnailUrl: input.thumbnailUrl,
+          duration: input.duration,
+          position: maxPosition + 1,
+          source: input.source,
+          sourceId: input.sourceId,
+        });
+      }),
+    
+    getQueue: publicProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ input }) => {
+        return await db.getAutoplayQueue(input.sessionId);
+      }),
+    
+    removeFromQueue: publicProcedure
+      .input(z.object({ itemId: z.number() }))
+      .mutation(async ({ input }) => {
+        return await db.removeFromAutoplayQueue(input.itemId);
+      }),
+    
+    clearQueue: publicProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .mutation(async ({ input }) => {
+        return await db.clearAutoplayQueue(input.sessionId);
+      }),
+    
+    getNext: publicProcedure
+      .input(z.object({ sessionId: z.string() }))
+      .query(async ({ input }) => {
+        return await db.getNextAutoplayVideo(input.sessionId);
+      }),
+    
+    reorder: publicProcedure
+      .input(z.object({
+        sessionId: z.string(),
+        positions: z.array(z.object({ id: z.number(), position: z.number() }))
+      }))
+      .mutation(async ({ input }) => {
+        return await db.reorderAutoplayQueue(input.sessionId, input.positions);
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

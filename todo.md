@@ -73,3 +73,10 @@
 - [x] Remover a biblioteca da plataforma (página e navegação removidas)
 - [x] Tabela youtubeHistory criada para rastrear vídeos do YouTube sem autenticação
 - [x] Login agora é opcional (botão "Entrar (opcional)" na sidebar)
+
+
+## Novas Funcionalidades (Sessão 2)
+- [x] Salvar vídeos do YouTube em playlists
+- [x] Inscrições em canais do YouTube
+- [x] Feed de novos vídeos de canais inscritos na página inicial
+- [ ] Autoplay contínuo (reprodução automática em sequência) - Estrutura pronta no backend, aguardando integração no player

@@ -1,4 +1,3 @@
-import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import VideoLayout from "@/components/VideoLayout";
 import { trpc } from "@/lib/trpc";
@@ -15,9 +14,11 @@ import {
   Radio,
   CheckCircle2,
   ChevronRight,
+  Bell,
 } from "lucide-react";
 import { Link } from "wouter";
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 // Session ID for anonymous history tracking
 function getSessionId(): string {
@@ -156,6 +157,59 @@ function SuggestionSkeleton() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// Seção de canais inscritos
+function SubscribedChannelsSection() {
+  const sessionId = useMemo(() => getSessionId(), []);
+  const { data: subscriptions, isLoading } = trpc.youtubeSubscription.getSubscribed.useQuery({
+    sessionId,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-6 w-48" />
+        <div className="flex gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="w-20 h-20 rounded-full flex-shrink-0" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!subscriptions || subscriptions.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Bell className="w-5 h-5 text-primary" />
+        <h3 className="text-lg font-semibold text-foreground">Seus Canais</h3>
+      </div>
+      <ScrollArea className="w-full">
+        <div className="flex gap-4 pb-4">
+          {subscriptions.map((channel: any) => (
+            <div key={channel.id} className="flex flex-col items-center gap-2 flex-shrink-0">
+              <div className="w-20 h-20 rounded-full overflow-hidden bg-muted flex items-center justify-center">
+                {channel.channelThumbnail ? (
+                  <img
+                    src={channel.channelThumbnail}
+                    alt={channel.channelName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Radio className="w-8 h-8 text-muted-foreground" />
+                )}
+              </div>
+              <p className="text-xs text-center line-clamp-2 max-w-[80px]">{channel.channelName}</p>
+            </div>
+          ))}
+        </div>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
     </div>
   );
 }
@@ -303,6 +357,9 @@ export default function Home() {
               </Button>
             </Link>
           </div>
+
+          {/* Subscribed Channels */}
+          <SubscribedChannelsSection />
 
           {/* Continue Watching */}
           <ContinueWatchingSection />
