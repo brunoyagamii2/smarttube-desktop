@@ -80,3 +80,17 @@
 - [x] Inscrições em canais do YouTube
 - [x] Feed de novos vídeos de canais inscritos na página inicial
 - [ ] Autoplay contínuo (reprodução automática em sequência) - Estrutura pronta no backend, aguardando integração no player
+
+## Migração para Stack 100% Gratuita e Open-Source
+- [ ] Auditar todas as dependências Manus (OAuth, LLM, DataAPI, Storage, Notifications)
+- [ ] Remover Manus OAuth - substituir por autenticação local (email/senha com bcrypt + JWT)
+- [ ] Remover Manus LLM API - substituir sugestões por algoritmo local baseado em histórico
+- [ ] Remover Manus DataAPI - usar YouTube Data API v3 gratuita ou scraping via Invidious
+- [ ] Remover Manus Storage (S3) - usar armazenamento local ou Supabase Storage gratuito
+- [ ] Remover Manus Notifications - usar notificações do navegador (Web Push API)
+- [ ] Migrar banco de dados MySQL/TiDB para PostgreSQL (Supabase gratuito)
+- [ ] Configurar deploy no Vercel (frontend + API serverless)
+- [ ] Criar README completo com instruções de deploy
+- [ ] Adicionar licença open-source (MIT)
+- [ ] Configurar GitHub Actions para CI/CD
+- [ ] Garantir que todo o projeto funcione sem custos
